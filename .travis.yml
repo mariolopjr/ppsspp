@@ -113,11 +113,11 @@ after_success:
 deploy:
   provider: releases
   api_key: "${GITHUB_OAUTH}"
-	file:
-		- "build-ios/PPSSPP_v${TRAVIS_TAG}.ipa.zip"
-		- "build-ios/PPSSPP_v${TRAVIS_TAG}.app.zip"
+  file:
+    - "build-ios/PPSSPP_v${TRAVIS_TAG}.ipa.zip"
+    - "build-ios/PPSSPP_v${TRAVIS_TAG}.app.zip"
   skip_cleanup: true
   on:
-		tags: true
-		os: osx
-		env: PPSSPP_BUILD_TYPE=iOS
+    tags: true
+    os: osx
+    env: PPSSPP_BUILD_TYPE=iOS
