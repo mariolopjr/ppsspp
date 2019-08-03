@@ -3,6 +3,7 @@
 export USE_CCACHE=1
 export NDK_CCACHE=ccache
 NDK_VER=android-ndk-r18b
+VERSION_NUMBER=`echo "$(git describe --tags --match="v*" | sed -e 's@-\([^-]*\)-\([^-]*\)$@-\1-\2@;s@^v@@;s@%@~@g')"`
 
 download_extract() {
     aria2c -x 16 $1 -o $2
@@ -93,6 +94,14 @@ travis_script() {
     fi
     if [ "$PPSSPP_BUILD_TYPE" = "iOS" ]; then
         ./b.sh --ios
+		cd build-ios
+		mv PPSSPP.app PPSSPP_v${VERSION_NUMBER}.app
+		ldid -../ios/PPSSPP-Additional-Entitlements.plist PPSSPP_v${VERSION_NUMBER}.app/PPSSPP
+		zip -r PPSSPP_v${VERSION_NUMBER}.app.zip PPSSPP_v${VERSION_NUMBER}.app
+		mkdir Payload
+		mv PPSSPP_v${VERSION_NUMBER}.app Payload/PPSSPP_v${VERSION_NUMBER}.app
+		zip -r9 PPSSPP_v${VERSION_NUMBER}.ipa Payload/PPSSPP_v${VERSION_NUMBER}.app
+		zip PPSSPP_v${VERSION_NUMBER}.ipa.zip PPSSPP_v${VERSION_NUMBER}.ipa
     fi
     if [ "$PPSSPP_BUILD_TYPE" = "macOS" ]; then
         ./b.sh --headless
