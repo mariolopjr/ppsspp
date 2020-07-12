@@ -65,6 +65,9 @@ struct CompatFlags {
 	bool ForceMax60FPS;
 	bool JitInvalidationHack;
 	bool HideISOFiles;
+	bool MoreAccurateVMMUL;
+	bool ForceSoftwareRenderer;
+	bool DarkStalkersPresentHack;
 };
 
 class IniFile;

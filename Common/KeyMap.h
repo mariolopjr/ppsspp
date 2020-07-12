@@ -57,6 +57,10 @@ enum {
 	VIRTKEY_TEXTURE_DUMP = 0x40000019,
 	VIRTKEY_TEXTURE_REPLACE = 0x4000001A,
 	VIRTKEY_SCREENSHOT = 0x4000001B,
+	VIRTKEY_MUTE_TOGGLE = 0x4000001C,
+	VIRTKEY_OPENCHAT = 0x4000001D,
+	VIRTKEY_ANALOG_ROTATE_CW = 0x4000001E,
+	VIRTKEY_ANALOG_ROTATE_CCW = 0x4000001F,
 	VIRTKEY_LAST,
 	VIRTKEY_COUNT = VIRTKEY_LAST - VIRTKEY_FIRST
 };
@@ -68,6 +72,7 @@ enum DefaultMaps {
 	DEFAULT_MAPPING_SHIELD,
 	DEFAULT_MAPPING_OUYA,
 	DEFAULT_MAPPING_XPERIA_PLAY,
+	DEFAULT_MAPPING_MOQI_I7S,
 };
 
 const float AXIS_BIND_THRESHOLD = 0.75f;
@@ -141,6 +146,7 @@ namespace KeyMap {
 	bool IsNvidiaShieldTV(const std::string &name);
 	bool IsXperiaPlay(const std::string &name);
 	bool IsOuya(const std::string &name);
+	bool IsMOQII7S(const std::string &name);
 	bool HasBuiltinController(const std::string &name);
 
 	const std::set<std::string> &GetSeenPads();

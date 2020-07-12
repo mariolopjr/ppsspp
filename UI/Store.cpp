@@ -43,7 +43,7 @@ std::string ResolveUrl(std::string baseUrl, std::string url) {
 		return baseUrl;
 	} else if (url[0] == '/') {
 		return baseUrl + url.substr(1);
-	} else if (url.substr(0, 7) == "http://") {
+	} else if (startsWith(url, "http://") || startsWith(url, "https://")) {
 		return url;
 	} else {
 		// Huh.
@@ -240,10 +240,11 @@ void ProductView::CreateViews() {
 	Add(new TextView(entry_.name));
 	Add(new TextView(entry_.author));
 
-	I18NCategory *st = GetI18NCategory("Store");
-	I18NCategory *di = GetI18NCategory("Dialog");
+	auto st = GetI18NCategory("Store");
+	auto di = GetI18NCategory("Dialog");
 	wasInstalled_ = IsGameInstalled();
 	if (!wasInstalled_) {
+		launchButton_ = nullptr;
 		installButton_ = Add(new Button(st->T("Install")));
 		installButton_->OnClick.Handle(this, &ProductView::OnInstall);
 	} else {
@@ -431,8 +432,8 @@ void StoreScreen::CreateViews() {
 
 	root_ = new LinearLayout(ORIENT_VERTICAL);
 	
-	I18NCategory *di = GetI18NCategory("Dialog");
-	I18NCategory *st = GetI18NCategory("Store");
+	auto di = GetI18NCategory("Dialog");
+	auto st = GetI18NCategory("Store");
 
 	// Top bar
 	LinearLayout *topBar = root_->Add(new LinearLayout(ORIENT_HORIZONTAL));

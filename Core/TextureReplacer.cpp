@@ -18,7 +18,7 @@
 #ifdef USING_QT_UI
 #include <QtGui/QImage>
 #else
-#include <libpng17/png.h>
+#include <png.h>
 #endif
 
 #include <algorithm>
@@ -80,6 +80,8 @@ bool TextureReplacer::LoadIni() {
 	allowVideo_ = false;
 	ignoreAddress_ = false;
 	reduceHash_ = false;
+	// Prevents dumping the mipmaps.
+	ignoreMipmap_ = false;
 
 	if (File::Exists(basePath_ + INI_FILENAME)) {
 		IniFile ini;
@@ -128,6 +130,7 @@ bool TextureReplacer::LoadIniValues(IniFile &ini, bool isOverride) {
 	options->Get("ignoreAddress", &ignoreAddress_, ignoreAddress_);
 	// Multiplies sizeInRAM/bytesPerLine in XXHASH by 0.5.
 	options->Get("reduceHash", &reduceHash_, reduceHash_);
+	options->Get("ignoreMipmap", &ignoreMipmap_, ignoreMipmap_);
 	if (reduceHash_ && hash_ == ReplacedTextureHash::QUICK) {
 		reduceHash_ = false;
 		ERROR_LOG(G3D, "Texture Replacement: reduceHash option requires safer hash, use xxh32 or xxh64 instead.");
@@ -168,7 +171,7 @@ bool TextureReplacer::LoadIniValues(IniFile &ini, bool isOverride) {
 	}
 
 	if (filenameWarning) {
-		I18NCategory *err = GetI18NCategory("Error");
+		auto err = GetI18NCategory("Error");
 		host->NotifyUserMessage(err->T("textures.ini filenames may not be cross-platform"), 6.0f);
 	}
 
@@ -411,6 +414,9 @@ void TextureReplacer::NotifyTextureDecoded(const ReplacedTextureDecodeInfo &repl
 	if (ignoreAddress_) {
 		cachekey = cachekey & 0xFFFFFFFFULL;
 	}
+	if (ignoreMipmap_ && level > 0) {
+		return;
+	}
 
 	std::string hashfile = LookupHashFile(cachekey, replacedInfo.hash, level);
 	const std::string filename = basePath_ + hashfile;
@@ -460,7 +466,7 @@ void TextureReplacer::NotifyTextureDecoded(const ReplacedTextureDecodeInfo &repl
 		saveBuf.resize((pitch * h) / sizeof(u16));
 		switch (replacedInfo.fmt) {
 		case ReplacedTextureFormat::F_5650:
-			ConvertRGBA565ToRGBA8888(saveBuf.data(), (const u16 *)data, (pitch * h) / sizeof(u16));
+			ConvertRGB565ToRGBA8888(saveBuf.data(), (const u16 *)data, (pitch * h) / sizeof(u16));
 			break;
 		case ReplacedTextureFormat::F_5551:
 			ConvertRGBA5551ToRGBA8888(saveBuf.data(), (const u16 *)data, (pitch * h) / sizeof(u16));
@@ -469,7 +475,7 @@ void TextureReplacer::NotifyTextureDecoded(const ReplacedTextureDecodeInfo &repl
 			ConvertRGBA4444ToRGBA8888(saveBuf.data(), (const u16 *)data, (pitch * h) / sizeof(u16));
 			break;
 		case ReplacedTextureFormat::F_0565_ABGR:
-			ConvertABGR565ToRGBA8888(saveBuf.data(), (const u16 *)data, (pitch * h) / sizeof(u16));
+			ConvertBGR565ToRGBA8888(saveBuf.data(), (const u16 *)data, (pitch * h) / sizeof(u16));
 			break;
 		case ReplacedTextureFormat::F_1555_ABGR:
 			ConvertABGR1555ToRGBA8888(saveBuf.data(), (const u16 *)data, (pitch * h) / sizeof(u16));
@@ -687,6 +693,8 @@ bool TextureReplacer::GenerateIni(const std::string &gameID, std::string *genera
 		fs << "[options]\n";
 		fs << "version = 1\n";
 		fs << "hash = quick\n";
+		fs << "ignoreMipmap = false\n";
+		fs << "\n";
 		fs << "[games]\n";
 		fs << "# Used to make it easier to install, and override settings for other regions.\n";
 		fs << "# Files still have to be copied to each TEXTURES folder.";

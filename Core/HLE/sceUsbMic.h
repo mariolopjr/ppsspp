@@ -1,4 +1,4 @@
-// Copyright (C) 2003 Dolphin Project.
+// Copyright (c) 2019- PPSSPP Project.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -12,18 +12,8 @@
 // A copy of the GPL 2.0 should have been included with the program.
 // If not, see http://www.gnu.org/licenses/
 
-// Official SVN repository and contact information can be found at
-// http://code.google.com/p/dolphin-emu/
+// Official git repository and contact information can be found at
+// https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
 
 #pragma once
-
-#ifdef _WIN32
-
-#include "Atomic_Win32.h"
-
-#else
-
-// GCC-compatible compiler assumed!
-#include "Atomic_GCC.h"
-
-#endif
+void Register_sceUsbMic();

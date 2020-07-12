@@ -9,6 +9,7 @@
 #include "gfx/gl_common.h"
 #include "gfx/gl_debug_log.h"
 #include "gfx_es2/gpu_features.h"
+#include "thin3d/DataFormatGL.h"
 #include "math/dataconv.h"
 #include "math/math_util.h"
 
@@ -107,7 +108,6 @@ void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps, bool ski
 			}
 			case GLRInitStepType::TEXTURE_IMAGE:
 			{
-				GLRTexture *tex = step.texture_image.texture;
 				if (step.texture_image.allocType == GLRAllocType::ALIGNED) {
 					FreeAlignedMemory(step.texture_image.data);
 				} else if (step.texture_image.allocType == GLRAllocType::NEW) {
@@ -161,8 +161,8 @@ void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps, bool ski
 		case GLRInitStepType::BUFFER_SUBDATA:
 		{
 			GLRBuffer *buffer = step.buffer_subdata.buffer;
-			glBindBuffer(GL_ARRAY_BUFFER, buffer->buffer_);
-			glBufferSubData(GL_ARRAY_BUFFER, step.buffer_subdata.offset, step.buffer_subdata.size, step.buffer_subdata.data);
+			glBindBuffer(buffer->target_, buffer->buffer_);
+			glBufferSubData(buffer->target_, step.buffer_subdata.offset, step.buffer_subdata.size, step.buffer_subdata.data);
 			if (step.buffer_subdata.deleteData)
 				delete[] step.buffer_subdata.data;
 			CHECK_GL_ERROR_IF_DEBUG();
@@ -316,7 +316,11 @@ void GLQueueRunner::RunInitSteps(const std::vector<GLRInitStep> &steps, bool ski
 			if (!step.texture_image.data && step.texture_image.allocType != GLRAllocType::NONE)
 				Crash();
 			// For things to show in RenderDoc, need to split into glTexImage2D(..., nullptr) and glTexSubImage.
-			glTexImage2D(tex->target, step.texture_image.level, step.texture_image.internalFormat, step.texture_image.width, step.texture_image.height, 0, step.texture_image.format, step.texture_image.type, step.texture_image.data);
+
+			GLenum internalFormat, format, type;
+			int alignment;
+			Thin3DFormatToFormatAndType(step.texture_image.format, internalFormat, format, type, alignment);
+			glTexImage2D(tex->target, step.texture_image.level, internalFormat, step.texture_image.width, step.texture_image.height, 0, format, type, step.texture_image.data);
 			allocatedTextures = true;
 			if (step.texture_image.allocType == GLRAllocType::ALIGNED) {
 				FreeAlignedMemory(step.texture_image.data);
@@ -565,8 +569,12 @@ void GLQueueRunner::RunSteps(const std::vector<GLRStep *> &steps, bool skipGLCal
 							}
 						}
 						break;
+					default:
+						break;
 					}
 				}
+				break;
+			default:
 				break;
 			}
 			delete steps[i];
@@ -788,7 +796,6 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			}
 			if (c.clear.colorMask != colorMask) {
 				glColorMask(c.clear.colorMask & 1, (c.clear.colorMask >> 1) & 1, (c.clear.colorMask >> 2) & 1, (c.clear.colorMask >> 3) & 1);
-				colorMask = c.clear.colorMask;
 			}
 			if (c.clear.clearMask & GL_COLOR_BUFFER_BIT) {
 				float color[4];
@@ -810,6 +817,10 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 				glClearStencil(c.clear.clearStencil);
 			}
 			glClear(c.clear.clearMask);
+			// Restore the color mask if it was different.
+			if (c.clear.colorMask != colorMask) {
+				glColorMask(colorMask & 1, (colorMask >> 1) & 1, (colorMask >> 2) & 1, (colorMask >> 3) & 1);
+			}
 			if (c.clear.scissorW == 0) {
 				glEnable(GL_SCISSOR_TEST);
 			}
@@ -819,13 +830,16 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 		{
 			GLenum attachments[3];
 			int count = 0;
+			bool isFBO = step.render.framebuffer != nullptr;
+			bool hasDepth = isFBO ? step.render.framebuffer->z_stencil_ : false;
 			if (c.clear.clearMask & GL_COLOR_BUFFER_BIT)
-				attachments[count++] = GL_COLOR_ATTACHMENT0;
-			if (c.clear.clearMask & GL_DEPTH_BUFFER_BIT)
-				attachments[count++] = GL_DEPTH_ATTACHMENT;
-			if (c.clear.clearMask & GL_STENCIL_BUFFER_BIT)
-				attachments[count++] = GL_STENCIL_BUFFER_BIT;
-			glInvalidateFramebuffer(GL_FRAMEBUFFER, count, attachments);
+				attachments[count++] = isFBO ? GL_COLOR_ATTACHMENT0 : GL_COLOR;
+			if (hasDepth && (c.clear.clearMask & GL_DEPTH_BUFFER_BIT))
+				attachments[count++] = isFBO ? GL_DEPTH_ATTACHMENT : GL_DEPTH;
+			if (hasDepth && (c.clear.clearMask & GL_STENCIL_BUFFER_BIT))
+				attachments[count++] = isFBO ? GL_STENCIL_ATTACHMENT : GL_STENCIL;
+			if (glInvalidateFramebuffer != nullptr && count != 0)
+				glInvalidateFramebuffer(GL_FRAMEBUFFER, count, attachments);
 			CHECK_GL_ERROR_IF_DEBUG();
 			break;
 		}
@@ -1111,7 +1125,10 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
 			if (!c.texture_subimage.data)
 				Crash();
 			// For things to show in RenderDoc, need to split into glTexImage2D(..., nullptr) and glTexSubImage.
-			glTexSubImage2D(tex->target, c.texture_subimage.level, c.texture_subimage.x, c.texture_subimage.y, c.texture_subimage.width, c.texture_subimage.height, c.texture_subimage.format, c.texture_subimage.type, c.texture_subimage.data);
+			GLuint internalFormat, format, type;
+			int alignment;
+			Thin3DFormatToFormatAndType(c.texture_subimage.format, internalFormat, format, type, alignment);
+			glTexSubImage2D(tex->target, c.texture_subimage.level, c.texture_subimage.x, c.texture_subimage.y, c.texture_subimage.width, c.texture_subimage.height, format, type, c.texture_subimage.data);
 			if (c.texture_subimage.allocType == GLRAllocType::ALIGNED) {
 				FreeAlignedMemory(c.texture_subimage.data);
 			} else if (c.texture_subimage.allocType == GLRAllocType::NEW) {
@@ -1317,9 +1334,8 @@ void GLQueueRunner::PerformReadback(const GLRStep &pass) {
 }
 
 void GLQueueRunner::PerformReadbackImage(const GLRStep &pass) {
-	GLRTexture *tex = pass.readback_image.texture;
-
 #ifndef USING_GLES2
+	GLRTexture *tex = pass.readback_image.texture;
 	GLRect2D rect = pass.readback_image.srcRect;
 
 	if (gl_extensions.VersionGEThan(4, 5)) {

@@ -213,7 +213,7 @@ bool DirectoryFileHandle::Open(const std::string &basePath, std::string &fileNam
 	}
 	if (access & FILEACCESS_WRITE) {
 		desired   |= GENERIC_WRITE;
-		sharemode |= FILE_SHARE_WRITE;
+		sharemode |= FILE_SHARE_WRITE | FILE_SHARE_READ;
 	}
 	if (access & FILEACCESS_CREATE) {
 		if (access & FILEACCESS_EXCL) {
@@ -251,7 +251,7 @@ bool DirectoryFileHandle::Open(const std::string &basePath, std::string &fileNam
 
 		if (w32err == ERROR_DISK_FULL || w32err == ERROR_NOT_ENOUGH_QUOTA) {
 			// This is returned when the disk is full.
-			I18NCategory *err = GetI18NCategory("Error");
+			auto err = GetI18NCategory("Error");
 			host->NotifyUserMessage(err->T("Disk full while writing data"));
 			error = SCE_KERNEL_ERROR_ERRNO_NO_PERM;
 		} else if (!success) {
@@ -315,7 +315,7 @@ bool DirectoryFileHandle::Open(const std::string &basePath, std::string &fileNam
 		}
 	} else if (errno == ENOSPC) {
 		// This is returned when the disk is full.
-		I18NCategory *err = GetI18NCategory("Error");
+		auto err = GetI18NCategory("Error");
 		host->NotifyUserMessage(err->T("Disk full while writing data"));
 		error = SCE_KERNEL_ERROR_ERRNO_NO_PERM;
 	} else {
@@ -383,7 +383,7 @@ size_t DirectoryFileHandle::Write(const u8* pointer, s64 size)
 
 	if (diskFull) {
 		ERROR_LOG(FILESYS, "Disk full");
-		I18NCategory *err = GetI18NCategory("Error");
+		auto err = GetI18NCategory("Error");
 		host->NotifyUserMessage(err->T("Disk full while writing data"));
 		// We only return an error when the disk is actually full.
 		// When writing this would cause the disk to be full, so it wasn't written, we return 0.
@@ -442,7 +442,8 @@ void DirectoryFileHandle::Close()
 		if (SetEndOfFile(hFile) == 0) {
 			ERROR_LOG_REPORT(FILESYS, "Failed to truncate file.");
 		}
-#else
+#elif !PPSSPP_PLATFORM(SWITCH)
+		// Note: it's not great that Switch cannot truncate appropriately...
 		if (ftruncate(hFile, (off_t)needsTrunc_) != 0) {
 			ERROR_LOG_REPORT(FILESYS, "Failed to truncate file.");
 		}
@@ -607,7 +608,7 @@ bool DirectoryFileSystem::RemoveFile(const std::string &filename) {
 	return ReplayApplyDisk(ReplayAction::FILE_REMOVE, retValue, CoreTiming::GetGlobalTimeUs()) != 0;
 }
 
-u32 DirectoryFileSystem::OpenFile(std::string filename, FileAccess access, const char *devicename) {
+int DirectoryFileSystem::OpenFile(std::string filename, FileAccess access, const char *devicename) {
 	OpenFileEntry entry;
 	u32 err = 0;
 	bool success = entry.hFile.Open(basePath, filename, access, err);
@@ -794,10 +795,17 @@ static std::string SimulateVFATBug(std::string filename) {
 	// These are the characters allowed in DOS filenames.
 	static const char *FAT_UPPER_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&'(){}-_`~";
 	static const char *FAT_LOWER_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&'(){}-_`~";
+	static const char *LOWER_CHARS = "abcdefghijklmnopqrstuvwxyz";
+
+	// To avoid logging/comparing, skip all this if it has no lowercase chars to begin with.
+	size_t lowerchar = filename.find_first_of(LOWER_CHARS);
+	if (lowerchar == filename.npos) {
+		return filename;
+	}
 
 	bool apply_hack = false;
 	size_t dot_pos = filename.find('.');
-	if (dot_pos == filename.npos) {
+	if (dot_pos == filename.npos && filename.length() <= 8) {
 		size_t badchar = filename.find_first_not_of(FAT_LOWER_CHARS);
 		if (badchar == filename.npos) {
 			// It's all lowercase.  Convert to upper.
@@ -824,6 +832,7 @@ static std::string SimulateVFATBug(std::string filename) {
 	}
 
 	if (apply_hack) {
+		VERBOSE_LOG(FILESYS, "Applying VFAT hack to filename: %s", filename.c_str());
 		// In this situation, NT would write UPPERCASE, and just set a flag to say "actually lowercase".
 		// That VFAT flag isn't read by the PSP firmware, so let's pretend to "not read it."
 		std::transform(filename.begin(), filename.end(), filename.begin(), toupper);
@@ -1044,10 +1053,10 @@ bool VFSFileSystem::RemoveFile(const std::string &filename) {
 	return false;
 }
 
-u32 VFSFileSystem::OpenFile(std::string filename, FileAccess access, const char *devicename) {
+int VFSFileSystem::OpenFile(std::string filename, FileAccess access, const char *devicename) {
 	if (access != FILEACCESS_READ) {
 		ERROR_LOG(FILESYS, "VFSFileSystem only supports plain reading");
-		return 0;
+		return SCE_KERNEL_ERROR_ERRNO_INVALID_FLAG;
 	}
 
 	std::string fullName = GetLocalPath(filename);
@@ -1058,7 +1067,7 @@ u32 VFSFileSystem::OpenFile(std::string filename, FileAccess access, const char 
 	u8 *data = VFSReadFile(fullNameC, &size);
 	if (!data) {
 		ERROR_LOG(FILESYS, "VFSFileSystem failed to open %s", filename.c_str());
-		return 0;
+		return SCE_KERNEL_ERROR_ERRNO_FILE_NOT_FOUND;
 	}
 
 	OpenFileEntry entry;

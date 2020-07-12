@@ -28,17 +28,12 @@
 #include "GPU/ge_constants.h"
 #include "GPU/GPUState.h"
 #include "GPU/Math3D.h"
+#include "GPU/Common/FramebufferCommon.h"
+#include "GPU/Common/PresentationCommon.h"
 #include "GPU/Common/ShaderId.h"
 #include "GPU/Common/VertexDecoderCommon.h"
-#include "GPU/Common/FramebufferCommon.h"
 
 #include "GPU/Common/GPUStateUtils.h"
-
-bool CanUseHardwareTransform(int prim) {
-	if (!g_Config.bHardwareTransform)
-		return false;
-	return !gstate.isModeThrough() && prim != GE_PRIM_RECTANGLES;
-}
 
 bool IsStencilTestOutputDisabled() {
 	// The mask applies on all stencil ops.
@@ -562,7 +557,13 @@ void ConvertViewportAndScissor(bool useBufferedRendering, float renderWidth, flo
 	} else {
 		float pixelW = PSP_CoreParameter().pixelWidth;
 		float pixelH = PSP_CoreParameter().pixelHeight;
-		CenterDisplayOutputRect(&displayOffsetX, &displayOffsetY, &renderWidth, &renderHeight, 480, 272, pixelW, pixelH, ROTATION_LOCKED_HORIZONTAL);
+		FRect frame = GetScreenFrame(pixelW, pixelH);
+		FRect rc;
+		CenterDisplayOutputRect(&rc, 480, 272, frame, ROTATION_LOCKED_HORIZONTAL);
+		displayOffsetX = rc.x;
+		displayOffsetY = rc.y;
+		renderWidth = rc.w;
+		renderHeight = rc.h;
 		renderWidthFactor = renderWidth / 480.0f;
 		renderHeightFactor = renderHeight / 272.0f;
 	}

@@ -21,7 +21,6 @@
 #include "Common/CommonTypes.h"
 #include "Common/ChunkFile.h"
 #include "Common/FixedSizeQueue.h"
-#include "Common/Atomics.h"
 
 #ifdef _M_SSE
 #include <emmintrin.h>
@@ -47,17 +46,10 @@
 #include "Core/Util/AudioFormat.h"
 
 StereoResampler resampler;
-AudioDebugStats g_AudioDebugStats;
 
 // Should be used to lock anything related to the outAudioQueue.
 // atomic locks are used on the lock. TODO: make this lock-free
 std::atomic_flag atomicLock_;
-
-enum latency {
-	LOW_LATENCY = 0,
-	MEDIUM_LATENCY = 1,
-	HIGH_LATENCY = 2,
-};
 
 int eventAudioUpdate = -1;
 int eventHostAudioUpdate = -1;
@@ -106,31 +98,14 @@ static void __AudioCPUMHzChange() {
 
 
 void __AudioInit() {
-	memset(&g_AudioDebugStats, 0, sizeof(g_AudioDebugStats));
+	resampler.ResetStatCounters();
 	mixFrequency = 44100;
 	srcFrequency = 0;
 
-	switch (g_Config.iAudioLatency) {
-	case LOW_LATENCY:
-		chanQueueMaxSizeFactor = 1;
-		chanQueueMinSizeFactor = 1;
-		hwBlockSize = 16;
-		hostAttemptBlockSize = 256;
-		break;
-	case MEDIUM_LATENCY:
-		chanQueueMaxSizeFactor = 2;
-		chanQueueMinSizeFactor = 1;
-		hwBlockSize = 64;
-		hostAttemptBlockSize = 512;
-		break;
-	case HIGH_LATENCY:
-		chanQueueMaxSizeFactor = 4;
-		chanQueueMinSizeFactor = 2;
-		hwBlockSize = 64;
-		hostAttemptBlockSize = 512;
-		break;
-
-	}
+	chanQueueMaxSizeFactor = 2;
+	chanQueueMinSizeFactor = 1;
+	hwBlockSize = 64;
+	hostAttemptBlockSize = 512;
 
 	__AudioCPUMHzChange();
 
@@ -482,9 +457,8 @@ int __AudioMix(short *outstereo, int numFrames, int sampleRate) {
 	return resampler.Mix(outstereo, numFrames, false, sampleRate);
 }
 
-const AudioDebugStats *__AudioGetDebugStats() {
-	resampler.GetAudioDebugStats(&g_AudioDebugStats);
-	return &g_AudioDebugStats;
+void __AudioGetDebugStats(char *buf, size_t bufSize) {
+	resampler.GetAudioDebugStats(buf, bufSize);
 }
 
 void __PushExternalAudio(const s32 *audio, int numSamples) {

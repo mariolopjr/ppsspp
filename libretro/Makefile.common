@@ -7,10 +7,15 @@ GPUDIR			= $(CORE_DIR)/GPU
 EXTDIR			= $(CORE_DIR)/ext
 NATIVEDIR		= $(EXTDIR)/native
 
+SOURCES_CXX   :=
+SOURCES_C     :=
+SOURCES_ASM   :=
+
 INCFLAGS += \
 	-I$(CORE_DIR) \
 	-I$(COMMONDIR) \
 	-I$(CORE_DIR)/libretro \
+	-I$(EXTDIR)/glslang \
 	-I$(EXTDIR)/native \
 	-I$(EXTDIR)/zlib \
 	-I$(EXTDIR)/snappy \
@@ -20,6 +25,7 @@ INCFLAGS += \
 	-I$(EXTDIR)/armips \
 	-I$(NATIVEDIR)/ext \
 	-I$(NATIVEDIR) \
+	-I$(NATIVEDIR)/ext/libpng17 \
 	-I$(EXTDIR)/libkirk \
 	-I$(EXTDIR)/xbrz \
 	-I$(EXTDIR)/xxhash \
@@ -156,6 +162,7 @@ SOURCES_CXX += \
 	$(GPUCOMMONDIR)/DrawEngineCommon.cpp \
 	$(GPUCOMMONDIR)/SplineCommon.cpp \
 	$(GPUCOMMONDIR)/FramebufferCommon.cpp \
+	$(GPUCOMMONDIR)/PresentationCommon.cpp \
 	$(GPUCOMMONDIR)/ShaderId.cpp \
 	$(GPUCOMMONDIR)/ShaderCommon.cpp \
 	$(GPUCOMMONDIR)/ShaderUniforms.cpp \
@@ -188,6 +195,7 @@ SOURCES_CXX += \
 	$(GPUDIR)/Software/Clipper.cpp \
 	$(GPUDIR)/Software/Lighting.cpp \
 	$(GPUDIR)/Software/Rasterizer.cpp \
+	$(GPUDIR)/Software/RasterizerRectangle.cpp \
 	$(GPUDIR)/GLES/DepalettizeShaderGLES.cpp \
 	$(GPUDIR)/GLES/DepthBufferGLES.cpp \
 	$(GPUDIR)/GLES/VertexShaderGeneratorGLES.cpp \
@@ -304,6 +312,8 @@ SOURCES_CXX += $(NATIVEDIR)/math/dataconv.cpp \
           $(NATIVEDIR)/thin3d/DataFormatGL.cpp \
 	       $(NATIVEDIR)/thread/threadutil.cpp \
 	       $(NATIVEDIR)/thread/threadpool.cpp \
+	       $(NATIVEDIR)/thread/prioritizedworkqueue.cpp \
+	       $(NATIVEDIR)/ui/root.cpp \
 	       $(NATIVEDIR)/ui/screen.cpp \
 	       $(NATIVEDIR)/ui/ui.cpp \
           $(NATIVEDIR)/ui/ui_context.cpp \
@@ -381,10 +391,12 @@ SOURCES_CXX += $(NATIVEDIR)/math/dataconv.cpp \
 	       $(COREDIR)/HLE/sceHttp.cpp \
 	       $(COREDIR)/HLE/sceImpose.cpp \
 	       $(COREDIR)/HLE/sceIo.cpp \
+	       $(COREDIR)/HLE/sceUsbMic.cpp \
 	       $(COREDIR)/HLE/sceJpeg.cpp \
 	       $(COREDIR)/HLE/sceKernel.cpp \
 	       $(COREDIR)/HLE/sceKernelAlarm.cpp \
 	       $(COREDIR)/HLE/sceKernelEventFlag.cpp \
+	       $(COREDIR)/HLE/sceKernelHeap.cpp \
 	       $(COREDIR)/HLE/sceKernelInterrupt.cpp \
 	       $(COREDIR)/HLE/sceKernelMbx.cpp \
 	       $(COREDIR)/HLE/sceKernelMemory.cpp \
@@ -423,6 +435,7 @@ SOURCES_CXX += $(NATIVEDIR)/math/dataconv.cpp \
 	       $(COREDIR)/HLE/sceNp.cpp \
 	       $(COREDIR)/HLE/scePauth.cpp \
 	       $(COREDIR)/HLE/sceUsbGps.cpp \
+	       $(COREDIR)/HW/Camera.cpp \
 	       $(COREDIR)/HW/SimpleAudioDec.cpp \
 	       $(COREDIR)/HW/AsyncIOManager.cpp \
 	       $(COREDIR)/HW/MediaEngine.cpp \
@@ -468,10 +481,10 @@ SOURCES_CXX += $(NATIVEDIR)/math/dataconv.cpp \
 	       $(COREDIR)/System.cpp \
 	       $(COREDIR)/Util/BlockAllocator.cpp \
 	       $(COREDIR)/Util/PPGeDraw.cpp \
-	       $(COREDIR)/Util/ppge_atlas.cpp \
 	       $(COREDIR)/Util/AudioFormat.cpp \
           $(EXTDIR)/disarm.cpp \
-          $(CORE_DIR)/UI/TextureUtil.cpp
+          $(CORE_DIR)/UI/TextureUtil.cpp \
+          $(CORE_DIR)/UI/GameInfoCache.cpp
 
 SOURCES_CXX += $(COREDIR)/HLE/__sceAudio.cpp
 
@@ -690,11 +703,7 @@ ifneq (,$(findstring $(GIT_VERSION),$(shell grep -s char $(GIT_VERSION_SRC))))
 endif
 
 ifneq ($(GIT_VERSION_NO_UPDATE),1)
-   $(shell echo '// This is a generated file.' > $(GIT_VERSION_SRC))
-   $(shell echo >> $(GIT_VERSION_SRC))
    $(shell echo 'const char *PPSSPP_GIT_VERSION = "${GIT_VERSION}";' >> $(GIT_VERSION_SRC))
-   $(shell echo >> $(GIT_VERSION_SRC))
-   $(shell echo "// If you don't want this file to update/recompile, change to 1." >> $(GIT_VERSION_SRC))
    $(shell echo '#define PPSSPP_GIT_VERSION_NO_UPDATE 0' >> $(GIT_VERSION_SRC))
 endif
 
