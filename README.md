@@ -1,6 +1,8 @@
 PPSSPP - a fast and portable PSP emulator
 =========================================
 
+![.github/workflows/build-ios.yml](https://github.com/mariolopjr/ppsspp/workflows/.github/workflows/build-ios.yml/badge.svg)
+
 Created by Henrik Rydgård
 
 Additional code by many contributors, see the Credits screen
